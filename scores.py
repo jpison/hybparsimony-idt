@@ -106,6 +106,81 @@ def interpretability_score(model, nFeatures, X_val, y_val, tau):
     return (K*1e6) + CSS_bar
 
 
+
+
+def interpretability_score_weighted(model, nFeatures, X_val, y_val, tau):
+    """
+    Versión con cobertura ponderada.
+    - Cada muestra recibe el peso que usaste al entrenar (class_weight='balanced').
+    - El umbral tau se aplica sobre la suma de pesos, no sobre el recuento de filas.
+    """
+    # ------------------------------------------------------------------
+    # 0) Calculamos los pesos de clase EXACTAMENTE como los usa sklearn
+    #     class_weight = 'balanced'  ?  n_total / (n_clases * n_clase)
+    # ------------------------------------------------------------------
+    classes = np.unique(y_val)
+    w_vec   = compute_class_weight(class_weight="balanced",
+                                   classes=classes,
+                                   y=y_val)
+    class_w = dict(zip(classes, w_vec))          # {0: w0, 1: w1}
+
+
+    # 1) Índice de la hoja para cada fila de X_val
+    leaf_indices = model.apply(X_val)
+    if len(leaf_indices) == 0:
+        return 9999.9*1e6
+
+    # 2) DataFrame con etiqueta y peso de cada fila
+    y_series = pd.Series(y_val)             # ? conversión clave
+    df = pd.DataFrame({
+        "leaf": leaf_indices,
+        "y_true": y_val,
+        "w": y_series.map(class_w)          # peso según su clase
+    })
+
+    # 3) Cobertura ponderada: suma de pesos por hoja
+    weight_by_leaf = df.groupby("leaf")["w"].sum()
+
+    # 4) Pureza (CSS) igual que antes  no cambia
+    purezas = {}
+    for leaf_id, g in df.groupby("leaf"):
+        vals = g["y_true"].values
+        p1   = vals.mean()
+        p0   = 1 - p1
+        p_const = np.array([1.0, 0.0]) if p1 >= p0 else np.array([0.0, 1.0])
+        pred = np.tile(p_const, (len(vals), 1))
+        purezas[leaf_id] = log_loss(vals, pred, labels=[0, 1])
+
+    # 5) Ordeno hojas por cobertura ponderada, descendente
+    df_stats = pd.DataFrame({
+        "w_sum": weight_by_leaf,
+        "css_leaf": pd.Series(purezas)
+    }).sort_values("w_sum", ascending=False)
+
+    # 6) ¿Cuántas hojas necesito para cubrir tau · (peso total)?
+    total_w   = df["w"].sum()
+    threshold = tau * total_w
+    acc_w = 0.0
+    K = 0
+    css_sum = 0.0
+    for _, row in df_stats.iterrows():
+        acc_w  += row["w_sum"]
+        K      += 1
+        css_sum += row["css_leaf"]
+        if acc_w >= threshold:
+            break
+    if K == 0:
+        return 9999.9*1e6
+
+    CSS_bar = css_sum / K
+    return (K * 1e6) + CSS_bar
+
+
+
+
+
+
+
 # Global Constant
 TAU = None
 def set_tau(valor):
@@ -162,6 +237,12 @@ def getFitness_custom(algorithm, complexity, custom_eval_fun, ignore_warnings = 
             print(e)
             return np.array([-np.inf, np.inf]), None
     return fitness
+
+
+
+from sklearn.utils import compute_class_weight
+
+
 
 
 
