@@ -1,2 +1,4 @@
 # hybparsimony-idt
-HYBPARSIMONY-IDT: Hybrid Parsimonious Search for Interpretable Decision Trees
+## HYBPARSIMONY-IDT: Hybrid Parsimonious Search for Interpretable Decision Trees
+
+HYBPARSIMONY-IDT is a hybrid optimisation framework for learning interpretable decision trees across a wide range of tabular datasets. It combines Particle Swarm Optimisation and Genetic Algorithms with an interpretability-aware objective that integrates structural constraints and a novel metric based on rule coverage and class purity. This metric guides model selection when predictive performance is statistically indistinguishable, promoting simpler and more transparent solutions. Experimental results on 43 benchmark datasets demonstrate that the method significantly improves interpretability without compromising test accuracy. These findings highlight the potential of incorporating interpretability as a primary optimisation criterion in AutoML pipelines.
